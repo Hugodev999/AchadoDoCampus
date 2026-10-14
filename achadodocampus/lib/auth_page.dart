@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'app_database.dart';
+import 'home_page.dart';
 
 class AuthPage extends StatefulWidget {
   const AuthPage({super.key});
@@ -8,15 +10,14 @@ class AuthPage extends StatefulWidget {
 }
 
 class _AuthPageState extends State<AuthPage> {
-  // Controladores dos campos de texto
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
-  // Estado da aba selecionada (false = Entrar, true = Cadastrar)
-  bool _isCadastrarSelected = true;
+  bool _isCadastrarSelected = false; // Começa na aba Entrar para facilitar o teste
+  bool _isLoading = false;
+  final AppDatabase _db = AppDatabase();
 
-  // Cor principal do tema
   static const Color _primaryColor = Color(0xFF2563EB);
 
   @override
@@ -25,6 +26,72 @@ class _AuthPageState extends State<AuthPage> {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _submitAuth() async {
+    FocusScope.of(context).unfocus();
+
+    final email = _emailController.text.trim().toLowerCase();
+    final password = _passwordController.text.trim();
+    final name = _nameController.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
+      _showSnackBar('Preencha todos os campos obrigatórios.', Colors.red);
+      return;
+    }
+
+    if (_isCadastrarSelected && name.isEmpty) {
+      _showSnackBar('Por favor, informe seu nome completo.', Colors.red);
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    await Future.delayed(const Duration(milliseconds: 1200));
+
+    if (!mounted) return;
+
+    if (_isCadastrarSelected) {
+      bool success = _db.registerUser(email, password, name);
+
+      setState(() => _isLoading = false);
+
+      if (!success) {
+        _showSnackBar('Este e-mail já está cadastrado.', Colors.red);
+        return;
+      }
+
+      _showSnackBar('Conta criada com sucesso! Faça login.', Colors.green);
+      setState(() {
+        _isCadastrarSelected = false;
+        _passwordController.clear();
+      });
+    } else {
+      bool success = _db.loginUser(email, password);
+
+      setState(() => _isLoading = false);
+
+      if (!success) {
+        _showSnackBar('E-mail ou senha incorretos.', Colors.red);
+        return;
+      }
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => HomePage(userEmail: email),
+        ),
+      );
+    }
+  }
+
+  void _showSnackBar(String message, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: color,
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   @override
@@ -43,8 +110,6 @@ class _AuthPageState extends State<AuthPage> {
               const SizedBox(height: 28),
               _buildTabSelector(),
               const SizedBox(height: 24),
-
-              // Campo NOME COMPLETO (Apenas visível se 'Cadastrar' estiver selecionado)
               if (_isCadastrarSelected) ...[
                 _buildInputField(
                   label: 'NOME COMPLETO',
@@ -53,29 +118,22 @@ class _AuthPageState extends State<AuthPage> {
                 ),
                 const SizedBox(height: 20),
               ],
-
-              // Campo E-MAIL
               _buildInputField(
                 label: 'E-MAIL',
-                hintText: 'seu@email.com',
+                hintText: 'teste@email.com',
                 controller: _emailController,
               ),
               const SizedBox(height: 20),
-
-              // Campo SENHA
               _buildInputField(
                 label: 'SENHA',
                 hintText: '••••••••',
                 controller: _passwordController,
                 isPassword: true,
               ),
-
-              // Botão 'Esqueceu a senha?' (Apenas visível na aba 'Entrar')
               if (!_isCadastrarSelected) ...[
                 const SizedBox(height: 8),
                 _buildForgotPasswordButton(),
               ],
-
               const SizedBox(height: 24),
               _buildSubmitButton(),
               const SizedBox(height: 20),
@@ -89,8 +147,6 @@ class _AuthPageState extends State<AuthPage> {
       ),
     );
   }
-
-  // --- Componentes da Interface ---
 
   Widget _buildHeaderIcon() {
     return Center(
@@ -111,8 +167,8 @@ class _AuthPageState extends State<AuthPage> {
   }
 
   Widget _buildTitleSection() {
-    return Column(
-      children: const [
+    return const Column(
+      children: [
         Text(
           'Achados do Campus',
           textAlign: TextAlign.center,
@@ -234,7 +290,9 @@ class _AuthPageState extends State<AuthPage> {
     return Align(
       alignment: Alignment.centerRight,
       child: TextButton(
-        onPressed: () {},
+        onPressed: () {
+          _showSnackBar('Dica: Use teste@email.com e 123456', Colors.blue);
+        },
         style: TextButton.styleFrom(
           padding: EdgeInsets.zero,
           minimumSize: Size.zero,
@@ -256,13 +314,7 @@ class _AuthPageState extends State<AuthPage> {
     return SizedBox(
       height: 50,
       child: ElevatedButton(
-        onPressed: () {
-          if (_isCadastrarSelected) {
-            // Lógica de cadastro
-          } else {
-            // Lógica de login
-          }
-        },
+        onPressed: _isLoading ? null : _submitAuth,
         style: ElevatedButton.styleFrom(
           backgroundColor: _primaryColor,
           elevation: 0,
@@ -270,15 +322,24 @@ class _AuthPageState extends State<AuthPage> {
             borderRadius: BorderRadius.circular(12),
           ),
         ),
-        child: Text(
-          _isCadastrarSelected ? 'CRIAR CONTA' : 'ENTRAR',
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-            letterSpacing: 0.8,
-          ),
-        ),
+        child: _isLoading
+            ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2.5,
+                ),
+              )
+            : Text(
+                _isCadastrarSelected ? 'CRIAR CONTA' : 'ENTRAR',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  letterSpacing: 0.8,
+                ),
+              ),
       ),
     );
   }
