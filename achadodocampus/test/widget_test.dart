@@ -1,30 +1,37 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:achadodocampus/main.dart';
+import 'package:achadodocampus/home_page.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('dashboard mostra estatísticas e permite publicar item', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: HomePage(userEmail: 'teste@email.com'),
+      ),
+    );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    expect(find.text('Estatísticas do\ncampus'), findsOneWidget);
+    expect(find.text('74'), findsOneWidget);
+    expect(find.text('52'), findsOneWidget);
+    expect(find.text('70%'), findsOneWidget);
+    expect(find.text('Distribuição dos itens perdidos'), findsOneWidget);
 
-    // Tap the '+' icon and trigger a frame.
+    await tester.tap(find.text('7d'));
+    await tester.pumpAndSettle();
+    expect(find.text('7d'), findsOneWidget);
+
     await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byType(TextField),
+      'Chave encontrada na biblioteca',
+    );
+    await tester.tap(find.text('Publicar item'));
+    await tester.pumpAndSettle();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.text('Chave encontrada na biblioteca'), findsOneWidget);
   });
 }
